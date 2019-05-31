@@ -1,0 +1,291 @@
+//For passive properties
+REVERSAL_PAS = -70
+   
+//Mario Vuksic's in vivo data (44µm IML/OML border)
+IML_border = actCell.somaLoc.secRef.sec.L/2+44
+
+forsec actCell.all {e_pas=REVERSAL_PAS}
+
+forall {
+    insert cldifus
+    cli0_cldifus = 5
+    clo0_cldifus = 133.5
+    celsius = 37
+}
+
+PREL  = 0.18			// Phco3/Pcl relative permeability
+
+//For synaptic parameters, see Schmidt-Hieber et al. JN 2007; Santhakumar et al. J Neurophysiol 2005, Table 4
+
+TAU1 = 0.5	//dendritic HC-GC synapse, Santhakumar et al. 2005
+TAU2 = 6	//dendritic HC-GC synapse, Santhakumar et al. 2005
+G = 0.0005	//nS
+VARIANCE_G = 1e-8/4
+
+NOISE = 1		    //0 no noise
+STIMINTERVAL=100	//one event in X s
+printf("Stimulation frequency: %g Hz.\n",1000/STIMINTERVAL)
+STIMNUMBER=1e9		//unlimited source of mPSCs
+STIMSTART=0
+
+TAU1_ML = 0.5	//dendritic HC-GC synapse, Santhakumar et al. 2005
+TAU2_ML = 6	    //dendritic HC-GC synapse, Santhakumar et al. 2005	
+G_ML = 0.0005	//nS	
+VARIANCE_G_ML = 1e-8/4
+
+TAU1_GCL = 0.26	//somatic BC-GC synapse, Santhakumar et al. 2005
+TAU2_GCL = 5.5	//somatic BC-GC synapse, Santhakumar et al. 2005	
+G_GCL = 0.0016	//nS	
+VARIANCE_G_GCL = 1e-8/4
+
+TSTOP=30000
+
+SYNDENSITY = 0.5 //Megias (average spine density)
+
+// Creating objects and procedures for inserting synaptic inputs
+create presynapse	
+access presynapse
+{diam=0.01 L=0.01
+insert cldifus
+cli0_cldifus = 5
+clo0_cldifus = 133.5}	
+	
+
+objref list_of_Locations, list_of_OMLLocations, list_of_IMLLocations, list_of_GCLLocations, list_of_MLLocations
+list_of_Locations = new List()
+list_of_OMLLocations = new List()
+list_of_IMLLocations = new List()
+list_of_MLLocations = new List()
+list_of_GCLLocations = new List()
+
+
+objref list_of_synapses, list_of_presynapses, list_of_OMLsynapses, list_of_IMLsynapses, list_of_MLsynapses, list_of_GCLsynapses
+list_of_synapses = new List()
+list_of_presynapses = new List()
+list_of_OMLsynapses = new List()
+list_of_IMLsynapses = new List()
+list_of_MLsynapses = new List()
+list_of_GCLsynapses = new List()
+
+
+objref list_of_netcons, list_of_OMLnetcons, list_of_IMLnetcons, list_of_MLnetcons, list_of_GCLnetcons
+list_of_netcons = new List()
+list_of_OMLnetcons = new List()
+list_of_IMLnetcons = new List()
+list_of_MLnetcons = new List()
+list_of_GCLnetcons = new List()
+
+
+
+proc createInput() {
+	$o1 = new gaba($2)
+	$o1.tau1 = TAU1 	//ms
+	$o1.tau2 = TAU2 	//ms
+	$o1.P = PREL
+	list_of_synapses.append($o1)
+}
+
+
+proc createStim() {
+	access presynapse
+	$o1 = new NetStim($2)
+	$o1.start = STIMSTART	//ms
+	$o1.number = STIMNUMBER 	
+	$o1.interval = STIMINTERVAL	//ms
+	$o1.noise = NOISE
+	$o1.seed($3)		//to begin each simulation round (for a cell) with a different NetStim seed
+	list_of_presynapses.append($o1)
+}
+
+
+//initiating random number generator
+ropen("/proc/uptime")		// get a seed  that is changing based on the processing time
+	{			
+ 		rseed = fscan()		// so that simulation will not start with the same seed
+		ropen()		
+	}
+objref random
+random = new Random(rseed)
+
+
+//procedure for creating lists of synaptic objects
+
+proc create_list_of_MLLocations() {local i, nsyn	localobj tempLoc
+		nsyn = int(L*SYNDENSITY)
+		if (nsyn/2==int(nsyn/2)) {nsyn=nsyn+1} else {}	//keeping odd number of synapses
+		nseg = nsyn 			//making nseg equal to nsyn
+		for i=0,nsyn-1 {
+			node = (2*(i+1)-1)/(2*nseg)
+			tempLoc = new Location(node)
+			list_of_MLLocations.append(tempLoc)
+		}	
+}
+
+proc create_list_of_GCLLocations() {local i, nsyn	localobj tempLoc
+		nsyn = int(list_of_MLLocations.count()/3)
+		if (nsyn/2==int(nsyn/2)) {nsyn=nsyn+1} else {}	//keeping odd number of synapses
+		nseg = nsyn 			//making nseg equal to nsyn
+		for i=0,nsyn-1 {
+			node = (2*(i+1)-1)/(2*nseg)
+			tempLoc = new Location(node)
+			list_of_GCLLocations.append(tempLoc)
+		}	
+}
+
+proc create_list_of_Locations() {local i
+	for i=0,list_of_GCLLocations.count()-1 {
+		list_of_Locations.append(list_of_GCLLocations.o(i))
+	}
+	for i=0,list_of_MLLocations.count()-1 {
+		list_of_Locations.append(list_of_MLLocations.o(i))
+	}
+}
+
+proc create_synapses()  {local i	localobj syn, stim, syncon
+	for i=0,list_of_Locations.count()-1 {
+		list_of_Locations.o(i).secRef.sec {
+			createInput(syn, list_of_Locations.o(i).loc)
+			createStim(stim, 0.5, rseed)
+			syncon = new NetCon(list_of_presynapses.o(i), list_of_synapses.o(i), 0, 0, abs(random.normal(G,VARIANCE_G)))
+			list_of_netcons.append(syncon)		
+
+			if (i<=list_of_GCLLocations.count()-1) {
+				list_of_GCLnetcons.append(list_of_netcons.o(i))
+				list_of_GCLsynapses.append(list_of_synapses.o(i))
+	
+			} else {
+				list_of_MLnetcons.append(list_of_netcons.o(i))
+				list_of_MLsynapses.append(list_of_synapses.o(i))
+
+			}
+
+			if (list_of_Locations.o(i).distToRootCenter > IML_border) {
+				list_of_OMLnetcons.append(list_of_netcons.o(i))
+				list_of_OMLLocations.append(list_of_Locations.o(i))
+				list_of_OMLsynapses.append(list_of_synapses.o(i))
+			}
+
+			if (list_of_Locations.o(i).distToRootCenter <= IML_border && i>list_of_GCLLocations.count()-1) {
+				list_of_IMLnetcons.append(list_of_netcons.o(i))
+				list_of_IMLLocations.append(list_of_Locations.o(i))
+				list_of_IMLsynapses.append(list_of_synapses.o(i))
+			}
+		}
+	}
+}
+
+
+forsec actCell.den create_list_of_MLLocations()	
+forsec "section[0]" create_list_of_GCLLocations()
+create_list_of_Locations()	
+create_synapses()
+
+proc display(){
+printf("%d Synapses have been created.\n",list_of_Locations.count())
+printf("There are %d dendritic synapses\n",list_of_MLLocations.count())
+printf("There are %d perisomatic synapses.\n",list_of_GCLLocations.count()) 
+}
+
+
+//////////Procedures for scaling and silencing synapses//////////
+
+proc changeWeight() {local j localobj k
+	if (numarg()<1) {} else {j = $1 k = $o2}
+	k.weight = j
+}	
+	
+proc changeKinetics() {local i,j localobj k
+	if (numarg()<1) {} else {i = $1 j = $2 k = $o3}
+	k.tau1 = i
+	k.tau2 = j
+}
+
+//procedures for selective scaling and modifying kinetics of dendritic (ML) synapses
+proc scaleML() {local i, m, n
+	if (numarg()<1) {m = G_ML n = VARIANCE_G_ML} else {m = $1 n = $2}
+	for i=0,list_of_MLnetcons.count()-1 {
+		changeWeight(abs(random.normal(m,n)), list_of_MLnetcons.o(i)) 		
+	}
+	
+printf ("%d%s%.4f%s\n", list_of_MLnetcons.count(), " dendritic (ML) synapses have been scaled to ", m*1000, " nS.")
+}
+
+proc changeKineticsML() {local i, m, n
+	if (numarg()<1) {m = TAU1_ML n = TAU2_ML} else {m = $1 n = $2}
+	for i=0,list_of_MLsynapses.count()-1 {
+		changeKinetics(m,n,list_of_MLsynapses.o(i)) 		
+	}
+printf ("%s%.4f%s%.4f%s\n", "Tau1 and Tau2 of dendritic (ML) synapses have been changed to ", m, " and ", n, " ms.")
+}
+
+//procedures for selective scaling and modifying kinetics of somatic (GCL) synapses
+proc scaleGCL() {local i, m, n
+	if (numarg()<1) {m = G_GCL n = VARIANCE_G_GCL} else {m = $1 n = $2}
+	for i=0,list_of_GCLnetcons.count()-1 {
+		changeWeight(abs(random.normal(m,n)), list_of_GCLnetcons.o(i)) 		
+	}	
+printf ("%d%s%.4f%s\n", list_of_GCLnetcons.count(), " somatic (GCL) synapses have been scaled to ", m*1000, " nS.")
+}
+
+proc changeKineticsGCL() {local i, m, n
+	if (numarg()<1) {m = TAU1_GCL n = TAU2_GCL} else {m = $1 n = $2}
+	for i=0,list_of_GCLsynapses.count()-1 {
+		changeKinetics(m,n,list_of_GCLsynapses.o(i)) 		
+	}
+printf ("%s%.4f%s%.4f%s\n", "Tau1 and Tau2 of somatic (GCL) synapses have been changed to ", m, " and ", n, " ms.")
+}
+
+
+///////Initiating synaptic conductances and kinetics
+display()
+changeKineticsGCL()
+changeKineticsML()
+scaleGCL()
+scaleML()
+
+/*
+// Shape plot to see synapses
+objref s
+s = new Shape()
+s.observe(actCell.all)	   //to exclude the "presynapse" from the shape plot
+//s.view(681.65, 697.059, 309.5, 142.587, 230, 132, 505.1, 232.7)
+//s.exec_menu("Show Diam")
+s.exec_menu("View = plot")  
+for i=0,list_of_MLLocations.count()-1 {
+	list_of_MLLocations.o(i).secRef.sec s.point_mark(list_of_MLsynapses.o(i),2)
+}
+for i=0,list_of_GCLLocations.count()-1 {
+	list_of_GCLLocations.o(i).secRef.sec s.point_mark(list_of_GCLsynapses.o(i),3)
+}
+
+s.exec_menu("View = plot")
+*/
+
+
+//define ionic concentrations
+cli0_cl_ion = cli0_cldifus 		         
+clo0_cl_ion = clo0_cldifus
+
+hco3i0_hco3_ion = 16
+hco3o0_hco3_ion = 26
+
+forall{
+	hco3i = 16 hco3o = 26
+	cli=5 clo=133.5
+}
+
+tstop = TSTOP
+
+init()
+proc display_par(){
+printf("PREL: %f \n",PREL)
+printf("Initial ECL: %f mV \n",ecl)
+printf("EHCO3: %f mV\n",ehco3)
+EGABA0 = PREL*ehco3+(1-PREL)*ecl
+printf("Initial EGABA: %f mV\n",EGABA0)
+}
+display_par()
+load_file("rig_GC.ses")
+load_file("plot.ses")
+
+

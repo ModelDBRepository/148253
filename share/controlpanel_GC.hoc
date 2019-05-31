@@ -1,0 +1,95 @@
+// ----------------------------------------------------------------------------
+// controlpanel.hoc
+// Create a control panel 
+//
+// 2007-10-03: local variables in morpho_info() were declared in changed_cell()
+//
+// ----------------------------------------------------------------------------
+REVERSAL_PAS = -7
+
+strdef cell_name,h_cell_name,path_name,cellno,cmd
+ncells = 8
+objref actCell
+curCellIndex = -1
+defaultCellIndex = 6 
+breakall = 0
+
+begintemplate CellButton
+public label, state
+strdef label
+proc init() {
+	sprint(label,"Cell %d",$1+1)
+	state = $2
+}
+endtemplate CellButton
+
+objref CellButtonList
+CellButtonList = new List()
+
+for i=0, ncells-1 {
+	if (i == defaultCellIndex) {
+		CellButtonList.append(new CellButton(i,1))
+	} else {
+		CellButtonList.append(new CellButton(i,0))
+	}
+}
+
+objref vboxP, vboxP2, hboxP, sP
+
+proc panels() {
+
+   vboxP.intercept(0)
+	
+}
+
+proc choose_cell() {local i
+	vboxP = new VBox()
+	vboxP.intercept(1)
+	hboxP = new HBox()
+	hboxP.intercept(1)
+	vboxP2 = new VBox()
+	vboxP2.intercept(1)
+	xpanel("Choose cell")
+	for i=0, CellButtonList.count()-1 {
+		xcheckbox(CellButtonList.o(i).label,&CellButtonList.o(i).state,"changed_cell()")		
+	}
+	xpanel()
+	vboxP2.intercept(0)
+	vboxP2.map
+	sP = new Shape()
+	changed_cell()
+	hboxP.intercept(0)
+	hboxP.map
+}
+
+proc changed_cell() {local i, storeIndex, allUnchecked 
+	allUnchecked = 1
+	storeIndex = curCellIndex
+	for i=0, CellButtonList.count()-1 {
+		
+		if (i == curCellIndex && CellButtonList.o(i).state == 1) {
+			CellButtonList.o(i).state = 0
+		}
+		
+		if (i != curCellIndex && CellButtonList.o(i).state == 1) {
+			sprint(cell_name,"cell_%d",i+1)
+			sprint(path_name,"./%s/membrane.hoc",cell_name)
+			load_file(path_name)
+			sprint(cmd,"actCell = new %s()",cell_name)
+			execute(cmd)
+			storeIndex = i
+			allUnchecked = 0
+			forall {e_pas=REVERSAL_PAS}
+			}
+	
+	}
+	curCellIndex = storeIndex
+
+	    print "------------------------------------------------------------------"
+		print "Loaded:  ",cell_name
+		print "------------------------------------------------------------------"
+}
+
+
+
+

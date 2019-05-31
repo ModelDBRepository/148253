@@ -1,0 +1,17 @@
+load_file("nrngui.hoc")
+load_file("./share/config.hoc")
+load_file("./share/controlpanel_GC.hoc")
+
+choose_cell()
+panels()
+// Set variable time step integration method
+//cvode_active(1)
+load_file("stdrun.hoc")
+
+v_init = -70	// mV
+
+//load_file("test.hoc")
+
+load_file("init_ClmIPSCs_GC_single.hoc")
+load_file("shape_single.hoc")
+

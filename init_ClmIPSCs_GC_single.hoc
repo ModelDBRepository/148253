@@ -1,0 +1,227 @@
+//For passive properties
+REVERSAL_PAS = -70
+//Mario Vuksic's in vivo data (44µm IML/OML border)
+IML_border = actCell.somaLoc.secRef.sec.L/2+44	
+
+
+forsec actCell.all {e_pas=REVERSAL_PAS}
+//reminder: all,den,axo are lists of all, dendritic and axonal sections, respectively
+
+forall {
+
+    insert cldifus
+    cli0_cldifus = 5
+    clo0_cldifus = 133.5
+    celsius = 35
+}
+
+PREL  = 0.18			// Phco3/Pcl relative permeability
+
+DISTAL_SIMULATION = 0		// 0 for simulation of a centric dendritic synapse
+DIAM_SIMULATION = 0
+DIAM = 2
+//For synaptic parameters, see Schmidt-Hieber et al. JN 2007; Santhakumar et al. J Neurophysiol 2005, Table 4
+
+TAU1 = 0.5	//dendritic HC-GC synapse, Santhakumar et al. 2005
+TAU2 = 6	//dendritic HC-GC synapse, Santhakumar et al. 2005
+G = 0.0005
+VARIANCE_G = 0
+
+NOISE = 1		//0 no noise
+STIMINTERVAL=25	//one event in X s
+printf("Stim. frequency: %g Hz.\n",1000/STIMINTERVAL)
+
+STIMNUMBER=1e9		//unlimited source of mPSCs
+STIMSTART=0
+
+TSTOP=5000
+
+
+// Creating objects and procedures for inserting synaptic inputs
+//artificial presynaptic compartment for stimulation
+create presynapse	
+access presynapse
+{diam=0.01 L=0.01
+insert cldifus
+cli0_cldifus = 5
+clo0_cldifus = 133.5}	
+	
+objref list_of_Locations
+list_of_Locations = new List()
+
+objref list_of_synapses
+list_of_synapses = new List()
+
+objref list_of_presynapses
+list_of_presynapses = new List()
+
+objref list_of_netcons
+list_of_netcons = new List()
+
+objref list_of_synLocations
+list_of_synLocations = new List()
+
+proc createInput() {
+	$o1 = new gaba($2)
+	$o1.tau1 = TAU1 	//ms
+	$o1.tau2 = TAU2 	//ms
+	$o1.P = PREL
+	list_of_synapses.append($o1)
+}
+
+
+proc createStim() {
+	access presynapse
+	$o1 = new NetStim($2)
+	$o1.start = STIMSTART	//ms
+	$o1.number = STIMNUMBER 	
+	$o1.interval = STIMINTERVAL	//ms
+	$o1.noise = NOISE
+	$o1.seed($3)		//to begin each simulation round (for a cell) with a different NetStim seed
+	list_of_presynapses.append($o1)
+}
+
+//initiating random number generator
+ropen("/proc/uptime")		// get a seed  that is changing based on the processing time
+	{			
+ 		rseed = fscan()		// so that simulation will not start with the same seed
+		ropen()		
+	}
+objref random
+random = new Random(rseed)
+
+//creating list of locations (path from a selected distal dendrite to soma)
+	
+actCell.somaLoc.secRef.sec distance(0,actCell.somaLoc.loc)
+actCell.synDendLoc.secRef.sec {
+	maxLength=distance(1.0)
+}
+
+centricdistance=maxLength/2
+printf("Centric distance from soma: %f\n",centricdistance)
+
+// Walk from distal dendrite to center of soma:
+actCell.synDendLoc.secRef.sec list_of_Locations = pathToRootCenter()
+
+//determine location for a synapse
+objref dist_from_center
+dist_from_center = new Vector()
+
+objref dist_from_center2
+dist_from_center2 = new Vector()
+
+for i=0,list_of_Locations.count()-1 {
+	list_of_Locations.o(i).secRef.sec {
+				dist_from_center.append(abs(list_of_Locations.o(i).distToRootCenter-centricdistance))
+	}
+}
+
+i=dist_from_center.min_ind()
+printf("Index for the centric location: %f\n",i)
+
+//changing the diameter of the dendrite
+
+if (DIAM_SIMULATION == 1)  {
+	for i=0,list_of_Locations.count()-1 {
+		list_of_Locations.o(i).secRef.sec {
+			if (issection(".*section[0]")) {} else {list_of_Locations.o(i).secRef.sec.diam = DIAM}		
+			printf("The dendritic diameter at the rec. site %f is:  %f\n",i,list_of_Locations.o(i).secRef.sec.diam)	
+		}	
+	}
+i=0
+	
+}
+
+//procedure for creating lists of synaptic objects
+
+proc create_synapses()  {local i, j, k, node  	localobj syn, stim, syncon, tempLoc, helplist	
+	if (DISTAL_SIMULATION == 1)  {
+		printf("Want to simulate a distal synapse because DISTAL_SIMULATION is: %d\n",DISTAL_SIMULATION)
+		actCell.synDendLoc.secRef.sec  {
+						node = (2*nseg-1)/(2*nseg)
+						printf("Number of segments and the node: %f\n",nseg)
+					    printf("Number of node: %f\n",node)
+					    printf("Number of node: %f\n",node)
+						tempLoc = new Location(node)
+						createInput(syn, tempLoc.loc)
+						createStim(stim, 0.5, rseed)
+						syncon = new NetCon(list_of_presynapses.o(0), list_of_synapses.o(0), 0, 0, G)
+						list_of_netcons.append(syncon)		//list_of_netcons = netcon.synlist(list_of_netcons)
+						list_of_synLocations.append(tempLoc)
+						/*
+						printf("Distal synapse has been created %d um from soma (%g nS, %g ms, %g ms.)\n",list_of_synLocations.o(0).distToRootCenter, 1000*G, TAU1, TAU2)
+						printf("Dendritic diameter at the syn. location: %g um.", list_of_synLocations.o(0).secRef.sec.diam(node))
+						*/
+		}
+	} 
+	if (DISTAL_SIMULATION == 0)  {
+		helplist = new List()
+		printf("Want to simulate a centric synapse because DISTAL_SIMULATION is: %d\n",DISTAL_SIMULATION)
+		i = dist_from_center.min_ind()
+		list_of_Locations.o(i).secRef.sec {
+					for j = 0, nseg-1 {			//looking for the node to insert the centric synapse
+							node = (2*(j+1)-1)/(2*nseg)
+							tempLoc = new Location(node)
+							helplist.append(tempLoc)
+							dist_from_center2.append(abs(helplist.o(j).distToRootCenter-centricdistance))
+					}
+					k = dist_from_center2.min_ind()
+					node = (2*(k+1)-1)/(2*nseg)
+					printf("Number of segments and the node: %f\n",nseg)
+					printf("Number of node: %f\n",node)
+					tempLoc = new Location(node)		
+					createInput(syn, tempLoc.loc)
+					createStim(stim, 0.5, rseed)
+					syncon = new NetCon(list_of_presynapses.o(0), list_of_synapses.o(0), 0, 0, G)
+					list_of_netcons.append(syncon)		//list_of_netcons = netcon.synlist(list_of_netcons)
+					list_of_synLocations.append(tempLoc)
+					/*
+					printf("Centric synapse has been created %d um from soma (%g nS, %g ms, %g ms).\n",list_of_synLocations.o(0).distToRootCenter, 1000*G, TAU1, TAU2)
+					printf("Dendritic diameter at the syn. location: %g um.", list_of_Locations.o(i).secRef.sec.diam(node))
+					*/
+		}
+	}
+}
+	
+create_synapses()
+
+// shape plot to see synapses
+objref s
+s = new Shape()	
+s.observe(actCell.all)	
+s.exec_menu("Show Diam")
+s.exec_menu("View = plot")
+actCell.synDendLoc.secRef.sec s.point_mark(list_of_synapses.o(0),2)
+
+
+//define ionic concentrations
+cli0_cl_ion = cli0_cldifus 	 
+clo0_cl_ion = clo0_cldifus
+
+hco3i0_hco3_ion = 16
+hco3o0_hco3_ion = 26
+
+forall{
+	hco3i = 16 hco3o = 26
+	cli=5 clo=133.5
+}
+
+init()
+proc display_par(){
+printf("PREL: %f \n",PREL)
+printf("Initial ECL: %f mV\n",ecl)
+printf("EHCO3: %f mV\n",ehco3)
+EGABA0 = PREL*ehco3+(1-PREL)*ecl
+printf("Initial EGABA: %f mV\n",EGABA0)
+}
+display_par()
+
+
+load_file("rig_single.ses")
+load_file("plot_single.ses")
+
+
+
+
+
+

@@ -1,0 +1,12 @@
+objref ps
+ps = new PlotShape(0)
+ps.size(-328.143,241.006,-386.997,282.856)
+ps.variable("delta_egaba_cldifus")
+ps.view(-328.143, -386.997, 569.149, 669.853, 344, 106, 214.2, 253)
+fast_flush_list.append(ps)
+// all lengths are plotted 1*actual size
+forall ps.len_scale(1)
+ps.exec_menu("Show Diam")
+ps.exec_menu("Shape Plot")
+// to change the variable scale 
+ps.scale(0,18)

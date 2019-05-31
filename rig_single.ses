@@ -1,0 +1,77 @@
+objectvar save_window_, rvp_
+objectvar scene_vector_[2]
+objectvar ocbox_, ocbox_list_, scene_, scene_list_
+{ocbox_list_ = new List()  scene_list_ = new List()}
+{
+xpanel("RunControl", 0)
+v_init = v_init
+xvalue("Init","v_init", 1,"stdinit()", 1, 1 )
+xbutton("Init & Run","run()")
+xbutton("Stop","stoprun=1")
+runStopAt = 5
+xvalue("Continue til","runStopAt", 1,"{continuerun(runStopAt) stoprun=1}", 1, 1 )
+runStopIn = 1
+xvalue("Continue for","runStopIn", 1,"{continuerun(t + runStopIn) stoprun=1}", 1, 1 )
+xbutton("Single Step","steprun()")
+t = 0
+xvalue("t","t", 2 )
+tstop = 5000
+xvalue("Tstop","tstop", 1,"tstop_changed()", 0, 1 )
+dt = 0.025
+xvalue("dt","dt", 1,"setdt()", 0, 1 )
+steps_per_ms = 40
+xvalue("Points plotted/ms","steps_per_ms", 1,"setdt()", 0, 1 )
+xcheckbox("Quiet",&stdrun_quiet,"")
+realtime = 0
+xvalue("Real Time","realtime", 0,"", 0, 1 )
+xpanel(49,244)
+}
+
+/*
+{
+xpanel("hco3_ion (Globals)", 0)
+hco3i0_hco3_ion = 16
+xvalue("hco3i0_hco3_ion","hco3i0_hco3_ion", 1,"", 0, 0 )
+hco3o0_hco3_ion = 26
+xvalue("hco3o0_hco3_ion","hco3o0_hco3_ion", 1,"", 0, 0 )
+xpanel(463,26)
+}
+{
+xpanel("Temperature", 0)
+celsius = 35
+xvalue("celsius","celsius", 1,"", 0, 1 )
+xpanel(526,175)
+}
+{
+xpanel("cl_ion (Globals)", 0)
+cli0_cl_ion = 5
+xvalue("cli0_cl_ion","cli0_cl_ion", 1,"", 0, 0 )
+clo0_cl_ion = 133.5
+xvalue("clo0_cl_ion","clo0_cl_ion", 1,"", 0, 0 )
+xpanel(792,22)
+}
+
+{
+xpanel("ChangeProcedures", 0)
+//NOISE = 0
+xvalue("noise","NOISE", 1,"changeNoise(NOISE)", 1, 1 )
+//PREL = 0.18
+xvalue("Relative conductance","PREL", 1,"changeP(PREL)", 1, 1 )
+//G = 0.0005
+xvalue("Conductance","G", 1,"changeG(G)", 1, 1 )
+//TAU1 = 0.5
+xvalue("Rise time","TAU1", 1,"changeTau1(TAU1)", 1, 1 )
+//TAU2 = 6
+xvalue("Decay time","TAU2", 1,"changeTau2(TAU2)", 1, 1 )
+//INTERVAL = 25
+xvalue("interval","INTERVAL",1,"", 0, 0 )
+//NUMBER = 80
+xvalue("number","NUMBER",1,"", 0, 0 )
+//START = 50
+xvalue("start","START",1,"", 0, 0 )
+xbutton("changeStim","changeStim(INTERVAL,NUMBER,START)")
+xpanel(49,244)
+}
+*/
+objectvar scene_vector_[1]
+{doNotify()}
