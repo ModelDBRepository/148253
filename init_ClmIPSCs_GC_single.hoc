@@ -1,6 +1,6 @@
 //For passive properties
 REVERSAL_PAS = -70
-//Mario Vuksic's in vivo data (44µm IML/OML border)
+//Mario Vuksic's in vivo data (44Âµm IML/OML border)
 IML_border = actCell.somaLoc.secRef.sec.L/2+44	
 
 
